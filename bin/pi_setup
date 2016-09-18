@@ -1,0 +1,28 @@
+#!/bin/sh
+
+this_program=RASP_pi_setup
+
+get_timestamp() {
+  echo "00000000"
+}
+
+## Basic UI/X11 desktop customization
+ui() {
+  echo "$this_program: `get_timestamp`: customizing UI"
+  apt-get install -y  xterm
+  sed -i 's/#force_color_prompt=yes/force_color_prompt=yes/g' ~/.bashrc
+}
+
+## Install needed packages to operate as a USB camera platform/controller
+usb_camera() {
+  echo "$this_program: `get_timestamp`: Installing USB camera packages"
+  apt-get install -y  guvcview
+  apt-get install -y  fswebcam     
+  #fswebcam image.jpg
+}
+
+# to do check for sudo
+#apt-get update -y
+#ui
+#usb_camera
+
