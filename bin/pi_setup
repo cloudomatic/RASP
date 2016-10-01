@@ -6,6 +6,12 @@ get_timestamp() {
   echo "00000000"
 }
 
+basic_setup() {
+  if [ `cat /home/pi/.bashrc | grep "setxkbmap us" | wc -l ` -lt 1 ]; then
+    echo "setxkbmap us" >> /home/pi/.bashrc
+  fi
+}
+
 ## Basic UI/X11 desktop customization
 ui() {
   echo "$this_program: `get_timestamp`: customizing UI"
@@ -22,6 +28,7 @@ usb_camera() {
 }
 
 # to do check for sudo
+basic_setup
 #apt-get update -y
 #ui
 #usb_camera
