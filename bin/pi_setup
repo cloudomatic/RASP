@@ -1,6 +1,5 @@
 #!/bin/sh
 
-this_program=RASP_pi_setup
 
 get_timestamp() {
   echo "00000000"
@@ -14,22 +13,71 @@ basic_setup() {
 
 ## Basic UI/X11 desktop customization
 ui() {
-  echo "$this_program: `get_timestamp`: customizing UI"
+  echo "$0: `get_timestamp`: customizing UI"
   apt-get install -y  xterm
   sed -i 's/#force_color_prompt=yes/force_color_prompt=yes/g' ~/.bashrc
 }
 
 ## Install needed packages to operate as a USB camera platform/controller
 usb_camera() {
-  echo "$this_program: `get_timestamp`: Installing USB camera packages"
+  echo "$0: `get_timestamp`: Installing USB camera packages"
   apt-get install -y  guvcview
   apt-get install -y  fswebcam     
   #fswebcam image.jpg
 }
 
+## Change the password for "pi".  Never got this to work
+change_pi_password() {
+  # Read the password 
+  if [ ! -r ~/.pi_secret ]; then
+    echo -e "\n$0: ERROR: Cannot find file ~/.pi_secret"
+    exit 1
+  fi
+  password=`cat ~/.pi_secret`
+  sudo echo "pi:$password" | chpasswd
+  
+}
+
+setup_git() {
+  git config --global user.email "anon@github.com"
+  git config --global user.name "anonymous" 
+}
+## Setup this node as a Docker host
+docker_host() {
+  # Set git user
+  setup_git
+  # TO DO: Validate external network connectivity
+  # Check for a Docker installation
+  docker_version=$(docker --version 2>&1)
+  if [ `echo "$docker_version" | grep "not found" | wc -l` -eq 0 ]; then
+    # Docker is installed
+    echo "Docker is installed, version=$docker_version"
+    #sudo apt-get remove docker docker-engine docker.io
+  else
+    echo "$0: No Docker version detected.  Installing Docker."
+    #curl -fsSL get.docker.com -o get-docker.sh
+    #sudo sh get-docker.sh
+  fi
+  sudo chown pi /var/run/docker.sock
+  # Hack for this issue: https://github.com/moby/moby/issues/35587
+  if [ `grep "cgroup_memory=1" /boot/cmdline.txt | wc -l ` -lt 1 ]; then
+    echo "cgroup_memory=1" | sudo tee -a /boot/cmdline.txt
+  fi
+  #sudo pip install docker-compose
+}
+
+## Update the OS
+install_updates() {
+  #TO DO: Verify network connectivity
+  sudo apt-get update
+  sudo apt-get dist-upgrade
+}
+
 # to do check for sudo
-basic_setup
+#install_updates
+#basic_setup
 #apt-get update -y
 #ui
 #usb_camera
+docker_host
 
