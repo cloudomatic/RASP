@@ -42,6 +42,26 @@ setup_git() {
   git config --global user.email "anon@github.com"
   git config --global user.name "anonymous" 
 }
+
+## Delete all running containers
+docker_clean() {
+  docker rm `docker ps -a | awk '{print $1}' | grep -v CONTAINER | xargs`
+}
+
+## Validate the Docker installation     
+test_docker() {
+  # Create a build folder, with a single Dockerfile in it
+  if [ ! -w /var/tmp/docker_project ]; then mkdir /var/tmp/docker_project; fi
+  cd /var/tmp/docker_project
+  echo "FROM resin/rpi-raspbian:latest\n\
+  RUN echo 'echo !!!!!!!!!!!!!!!!!!!!!!!!!  TEST SUCCESSFUL  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!' > /var/tmp/test\n\
+  RUN chmod ugo+rx /var/tmp/test\n" >/var/tmp/docker_project/Dockerfile
+  docker build -t delete-me:0.1 .
+  docker run -it --rm  delete-me:0.1 /var/tmp/test
+  docker rmi delete-me:0.1
+  rm -rf /var/tmp/docker_project
+}
+
 ## Setup this node as a Docker host
 docker_host() {
   # Set git user
@@ -52,21 +72,25 @@ docker_host() {
   if [ `echo "$docker_version" | grep "not found" | wc -l` -eq 0 ]; then
     # Docker is installed
     echo "Docker is installed, version=$docker_version"
-    #sudo apt-get remove docker docker-engine docker.io
+    #sudo apt-get remove docker docker-engine docker.io docker-ce
   else
     echo "$0: No Docker version detected.  Installing Docker."
-    #curl -fsSL get.docker.com -o get-docker.sh
-    #sudo sh get-docker.sh
+    curl -fsSL get.docker.com -o get-docker.sh
+    sudo sh get-docker.sh
   fi
-  #sudo chown pi /var/run/docker.sock
   if [ `id | grep docker | wc -l ` -lt 1 ]; then
     sudo adduser pi docker
   fi
-  # Hack for this issue: https://github.com/moby/moby/issues/35587
+  # Hack for this issue: https://github.com/moby/moby/issues/35587  Doesn't seem to affect Jessie
   if [ `grep "cgroup_memory=1" /boot/cmdline.txt | wc -l ` -lt 1 ]; then
     sudo sed -i 's/$/ cgroup_enable=memory cgroup_memory=1 /' /boot/cmdline.txt
   fi
-  #sudo pip install docker-compose
+  # The pip method seemed to be the best to install docker-compose
+  sudo apt-get install -y python-pip
+  sudo pip install docker-compose
+  # This method doesn't work yet, recommended by the compose page on docs.docker.com
+  #sudo curl -L https://github.com/docker/compose/releases/download/1.17.0/docker-compose-`uname -s`-`uname -m` -o /usr/local/bin/docker-compose
+
 }
 
 ## Update the OS
@@ -82,5 +106,6 @@ install_updates() {
 #apt-get update -y
 #ui
 #usb_camera
-docker_host
+#docker_host
+#test_docker
 
