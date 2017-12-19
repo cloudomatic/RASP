@@ -1,0 +1,246 @@
+#!/bin/sh
+
+
+#
+#  Docker management utility
+#
+#
+#
+#
+
+# Set to 1 to enable debugging
+DEBUG=1
+
+# Globals
+docker_installation_rpm=docker-engine-1.7.1-1.el6.x86_64.rpm
+jboss_installation_package=
+ews_installation_package=
+
+#
+# make_base_rhel_image() - Create an image from the local Yum repository
+#
+# make_base_rhel_image(): args: <image name>
+#          
+#       TO DO: It's not reading the RHEL version from /etc/redhat-release correctly
+#
+make_base_rhel_image() {
+  if [ "$1" == "" ]; then
+     echo -e "\n  $0: (exiting): function make_base_rhel_image() requires `cat $0 | grep 'make_base_rhel_image(): args' | grep -v echo | grep args | cut -f4- -d' ' `\n"
+     return
+  else 
+    image_name=$1
+    echo "Creating image $image_name"
+  fi
+  
+     #
+     # Create a base CentOS Docker image.
+     #
+     # This script is useful on systems with yum installed (e.g., building # a CentOS image on CentOS).  See contrib/mkimage-rinse.sh for a way # to build CentOS images on other systems.
+     #
+     # This was taken from https://github.com/docker/docker/blob/master/contrib/mkimage-yum.sh
+     #     with minor modifications appropriate to the CentOS environment
+     #
+     #
+     # To create an image, install docker-io on the local host:
+     #        sudo yum install -y docker-io
+     #        # Because /var is small, we create an alternative home for docker images and containers to run
+     #        sudo mkdir -p /home/docker/var #        # Edit the file /etc/sysconfig/docker and set 'other_args' to
+     #        #             other_args="-g /home/docker/var"
+     #        sudo service docker start
+     #        # We change the ownership of docker.sock so docker commands will run as a non-root user
+     #        sudo chgrp INF_ARCH_Users /var/run/docker.sock
+     #
+     # Edit the list of packages in the yum -install command down below with the desired packages for your Docker image
+     #        sudo make_docker_image test_image_01 #
+     # You will see your image in the local registry via the "docker images" command
+     #        # WARNING!  Docker doesn't seem to take image names with upper case characters
+     
+     
+     # option defaults
+     yum_config=/etc/yum.conf
+     while getopts ":y:h" opt; do
+     case $opt in
+     y)
+     yum_config=$OPTARG
+     ;;
+     h)
+     usage
+     ;;
+     ?)
+     echo "Invalid option: -$OPTARG"
+     usage
+     ;;
+     esac
+     done
+     shift $((OPTIND - 1))
+     name=$1
+     
+     if [[ -z $name ]]; then
+     usage
+     fi
+     
+     #--------------------
+     
+     target=$(mktemp -d --tmpdir $(basename $0).XXXXXX)
+     
+     set -x
+     
+     mkdir -m 755 "$target"/dev
+     mknod -m 600 "$target"/dev/console c 5 1 mknod -m 600 "$target"/dev/initctl p mknod -m 666 "$target"/dev/full c 1 7 mknod -m 666 "$target"/dev/null c 1 3 mknod -m 666 "$target"/dev/ptmx c 5 2 mknod -m 666 "$target"/dev/random c 1 8 mknod -m 666 "$target"/dev/tty c 5 0 mknod -m 666 "$target"/dev/tty0 c 4 0 mknod -m 666 "$target"/dev/urandom c 1 9 mknod -m 666 "$target"/dev/zero c 1 5
+     
+     # amazon linux yum will fail without vars set if [ -d /etc/yum/vars ]; then
+     mkdir -p -m 755 "$target"/etc/yum
+     cp -a /etc/yum/vars "$target"/etc/yum/ fi
+     
+     
+     #   Spacewalk plugin to Yum.  Package names should be specified here (all on one line) to be placed on the target image.  Because the yum command actually uses
+     #   the files in --installroot as it's Yum configuration, it won't accept two commands like:
+     #            yum installgroup core
+     #            yum intsall httpd
+     #   as the 2nd command will fail, because the yum configuration in $target/etc/yum* won't have the Spacewalk plugin, and the image itself isn't a Spacewalk client.
+     #  There is probably a better workaround to this, but putting them all on one line works in the interests of expediency.
+     #                        - Brent
+     
+     #yum -c "$yum_config"  --nogpgcheck    --installroot="$target" --releasever=/ --setopt=tsflags=nodocs --setopt=group_package_types=mandatory -y install @core erlang.x86_64 erlang-ssl.x86_64 tar openssl lsof curl nslookup ssh ping tel net
+     
+     ## This is for installing the "special" RabbitMQ/Erlang RPMs in the Salt repo #yum -c "$yum_config"  --nogpgcheck    --installroot="$target" --releasever=/ --setopt=tsflags=nodocs --setopt=group_package_types=mandatory -y install @core tar openssl lsof  wxBase-2.8.12-1.el6.x86_64 wxGTK-gl-2.8.12-1.el6.x86_64 w
+     xGTK-2.8.12-1.el6.x86_64  unixODBC-2.2.14-14.el6.x86_64
+     
+     # This is for Generic Tomcat
+     yum -c "$yum_config"  --nogpgcheck    --installroot="$target" --releasever=/ --setopt=tsflags=nodocs --setopt=group_package_types=mandatory -y install @core tar openssl lsof  curl nslookup ssh ping nc
+     
+     # An experiment in making a "micro" container for Apache only i
+     # This seemed successful in creating a 100MB Apache container with the minimal set of tools needed for debugging #yum -c "$yum_config"  --nogpgcheck    --installroot="$target" --releasever=/ --setopt=tsflags=nodocs --setopt=group_package_types=mandatory -y install  tar openssl lsof curl nslookup ssh ping nc sshd httpd mod_ssl vi procps
+     
+     #yum -c "$yum_config"  --nogpgcheck  --installroot="$target" --releasever=/ --setopt=tsflags=nodocs --setopt=group_package_types=mandatory -y install  tar openssl lsof curl nslookup ssh ping nc sshd vi procps passwd chage useradd
+     
+     #yum -c "$yum_config"  --nogpgcheck  --installroot="$target" --releasever=/ --setopt=tsflags=nodocs --setopt=group_package_types=mandatory -y install @core  tar openssl lsof curl nslookup ssh ping nc sshd vi procps passwd chage userad d mysql-libs-5.1.73-5.el6_7.1.x86_64 mysql-server-5.1.73-5.el6_7.1.x86_64 mysql-devel-5.1.73-5.el6_7.1.x86_64 php-mysql-5.3.3-46.el6_7.1.x86_64 postgresql-libs-8.4.20-4.el6_7.x86_64 postgresql-8.4.20-4.el6_7.x86_64 sqlite-3.6.20-1.el6_7.2.x86_64 mysql-workbench-community-6.3.6-1.el6.x86_64 postgresql-server-8.4.20-4.el6_7.x86_64 mysql-5.1.73-5.el6_7.1.x86_64
+     
+     
+     
+     yum -c "$yum_config"  --nogpgcheck    --installroot="$target" -y clean all
+     
+     echo "------------------ target contents ------------------"
+     ls -l $target
+     echo "-------------------------------------------------------"
+     
+     
+     
+cat > "$target"/etc/sysconfig/network <<EOF
+NETWORKING=yes
+HOSTNAME=localhost.localdomain
+EOF
+     
+     # effectively: febootstrap-minimize --keep-zoneinfo --keep-rpmdb --keep-services "$target".
+     #  locales
+     rm -rf "$target"/usr/{{lib,share}/locale,{lib,lib64}/gconv,bin/localedef,sbin/build-locale-archive}
+     #  docs and man pages
+     rm -rf "$target"/usr/share/{man,doc,info,gnome/help}
+     #  cracklib
+     rm -rf "$target"/usr/share/cracklib
+     #  i18n
+     rm -rf "$target"/usr/share/i18n
+     #  yum cache
+     rm -rf "$target"/var/cache/yum
+     mkdir -p --mode=0755 "$target"/var/cache/yum
+     #  sln
+     rm -rf "$target"/sbin/sln
+     #  ldconfig
+     rm -rf "$target"/etc/ld.so.cache "$target"/var/cache/ldconfig
+     mkdir -p --mode=0755 "$target"/var/cache/ldconfig
+     
+     version=
+     for file in "$target"/etc/{redhat,system}-release
+     do
+     if [ -r "$file" ]; then
+     version="$(sed 's/^[^0-9]*([0-9.]+).*$/1/' "$file")"
+     break
+     fi
+     done
+     
+     if [ -z "$version" ]; then
+       echo >&2 "warning: cannot autodetect OS version, using '$name' as tag"
+       version=$name
+     fi
+     
+     tar --numeric-owner -c -C "$target" . | docker import - $name:$version
+     
+     docker run -i -t --rm $name:$version /bin/bash -c 'echo success'
+     
+     rm -rf "$target"
+}
+
+
+run() { #private
+  docker run -i -t -v /home/dockershare:/home/dockershare -v /tools:/tools test_image_01:Red bash
+}
+
+#
+# Display help on commands for this program
+#
+help() {
+  echo -e ""
+  echo "   dmgr - Docker management utility"
+  echo ""
+  echo "   Usage:  dmgr <command> [options]"
+  echo ""
+  echo "   Commands:"
+  echo ""
+  cat $0 | grep "()" | grep -v grep | grep -v echo | grep -v "#"  | sed 's/() {//g' | awk '{printf("       %s\n", $1)}'
+  echo ""
+}
+
+
+
+#
+#  install() - Install the docker service on the local host
+#
+install() {
+  if [ `whoami` != "root" ]; then
+    echo -e "\n  $0: (exiting) The install() function must be run as root\n" #
+    return
+  fi
+
+
+  if [ ! -r $docker_installation_rpm ]; then
+    echo -e "\n  $0: (exiting) install() requires that the installation RPM be defined.\n                    Could not find <$docker_installation_rpm>\n"
+    return
+  fi
+
+  if [ `rpm -qa | grep docker | wc -l ` -gt 0 ]; then
+    echo -e "\n  $0: (exiting) install() detects an existing installation of the docker engine\n"
+    return
+  fi
+
+  #package_name=`echo $docker_installation_rpm | sed 's/\.rpm//g'`
+  yum install $docker_installation_rpm
+  service docker start
+}
+
+#
+# show_command_help() - Show the usage notes for a particular command
+# 
+#
+show_command_help() { #private
+  if [ $DEBUG ]; then echo "DEBUG: show_command_help(): >"; fi
+  echo -e "\n\n  usage: $0 $1 `cat $0 | grep $1 | grep "#" | grep -v echo | grep args | cut -f4- -d' ' | sed 's/[():]//g'`\n\n"
+  if [ $DEBUG ]; then echo "DEBUG: show_command_help(): <"; fi
+}
+
+
+
+# Start of program
+if [ -z $1 ]; then
+  echo -e "\n\n  usage: $0 <command>\n\n  '$0 help' lists  all available commands\n\n"
+  exit 0
+elif [ "$2" == "help" ]; then
+  #echo -e "\n\n `cat $0 | grep $1 | grep "#" | grep -v echo | grep args | awk '{printf("%s\n", $2)}'`\n\n"
+  #echo -e "\n\n  usage: $0 `cat $0 | grep $1 | grep "#" | grep -v echo | grep args | cut -f2,4- -d' ' | sed 's/[():]//g'`\n\n"
+  show_command_help $1
+else
+  $@
+fi
+
+
+
+

@@ -1,14 +1,29 @@
 #!/bin/sh
 
-
 get_timestamp() {
   echo "00000000"
 }
 
+## Basic customizations for all Raspbian installations that I like
 basic_setup() {
-  if [ `cat /home/pi/.bashrc | grep "setxkbmap us" | wc -l ` -lt 1 ]; then
-    echo "setxkbmap us" >> /home/pi/.bashrc
-  fi
+  # This doesn't seem to be relevant to stretch, worked in Jessie
+  #  if [ `cat /home/pi/.bashrc | grep "setxkbmap us" | wc -l ` -lt 1 ]; then
+  #    echo "setxkbmap us" >> /home/pi/.bashrc
+  #  fi
+
+  # Raspbian comes with vi by default, for which you don't get 
+  # home/end/arrow keys while in edit mode.  VIM is a bit of 
+  # an improvement
+  sudo apt-get install -y vim
+
+  # I hate colors in vim
+  echo -e  "syntax off\n\
+            set nohlsearch\n\
+            set t_Co=0\n\
+  " > ~/.vimrc
+
+  # Setup git
+  setup_git
 }
 
 ## Basic UI/X11 desktop customization
@@ -48,14 +63,16 @@ docker_clean() {
   docker rm `docker ps -a | awk '{print $1}' | grep -v CONTAINER | xargs`
 }
 
-## Validate the Docker installation     
+## Validate the Docker installation by creating an image, running it as a container,
+##   then cleaning everything up
 test_docker() {
   # Create a build folder, with a single Dockerfile in it
   if [ ! -w /var/tmp/docker_project ]; then mkdir /var/tmp/docker_project; fi
   cd /var/tmp/docker_project
   echo "FROM resin/rpi-raspbian:latest\n\
-  RUN echo 'echo !!!!!!!!!!!!!!!!!!!!!!!!!  TEST SUCCESSFUL  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!' > /var/tmp/test\n\
-  RUN chmod ugo+rx /var/tmp/test\n" >/var/tmp/docker_project/Dockerfile
+        RUN echo 'for i in {1..10}; do echo !!!!!!!!!!!!!!!!!!!!!!!!!  TEST SUCCESSFUL  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!' > /var/tmp/test; done \n\
+        RUN chmod ugo+rx /var/tmp/test\n\
+  " >/var/tmp/docker_project/Dockerfile
   docker build -t delete-me:0.1 .
   docker run -it --rm  delete-me:0.1 /var/tmp/test
   docker rmi delete-me:0.1
@@ -64,8 +81,6 @@ test_docker() {
 
 ## Setup this node as a Docker host
 docker_host() {
-  # Set git user
-  setup_git
   # TO DO: Validate external network connectivity
   # Check for a Docker installation
   docker_version=$(docker --version 2>&1)
@@ -107,5 +122,5 @@ install_updates() {
 #ui
 #usb_camera
 #docker_host
-#test_docker
+test_docker
 
