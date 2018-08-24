@@ -4,7 +4,7 @@ get_timestamp() {
   echo "00000000"
 }
 
-## Basic customizations for all Raspbian installations that I like
+## Basic customizations for all Raspbian installations
 basic_setup() {
   # This doesn't seem to be relevant to stretch, worked in Jessie
   #  if [ `cat /home/pi/.bashrc | grep "setxkbmap us" | wc -l ` -lt 1 ]; then
@@ -16,7 +16,7 @@ basic_setup() {
   # an improvement
   sudo apt-get install -y vim
 
-  # I hate colors in vim
+  # Turn off colors in vim
   echo -e  "syntax off\n\
             set nohlsearch\n\
             set t_Co=0\n\
